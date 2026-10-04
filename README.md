@@ -77,8 +77,9 @@ python -m pytest -q
 ruff check .
 ```
 
-原 Gateway3 实验版已在 F11 Pro + ESP32-C3 Proxy 上验证开关、20%/40% 调速、
-状态回读及 HA 重启重连；独立集成的验证结果见发布说明。
+独立集成已在 F11 Pro + ESP32-C3 Proxy 上实机验证：
+开关、20%/40% 调速、状态回读、HA 重启重连、错误 token 拒绝和界面重新配置。
+24 项自动测试和 GitHub Actions 通过。
 
 参考：
 - [官方 MIoT F11 规格](https://home.miot-spec.com/spec/szxzh.fan.f11)
