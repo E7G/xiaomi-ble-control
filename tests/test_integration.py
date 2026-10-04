@@ -156,3 +156,72 @@ async def test_diagnostics_never_include_token(modules):
     )
     assert data["properties"] == {"3.p.6": 43}
     assert "token" not in str(data) and "secret" not in str(data)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "authentication", "cancelled"])
+async def test_connection_validation_always_releases_client(modules, monkeypatch, failure):
+    module = modules("config_flow")
+    removed = []
+    monkeypatch.setattr(
+        module.bluetooth,
+        "async_register_callback",
+        lambda *_args: lambda: removed.append(True),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        module.bluetooth, "async_ble_device_from_address", lambda *_a, **_k: object()
+    )
+    info = SimpleNamespace(
+        service_data={"0000fe95-0000-1000-8000-00805f9b34fb": bytes.fromhex("1059925f00")}
+    )
+    monkeypatch.setattr(
+        module.bluetooth, "async_last_service_info", lambda *_a, **_k: info, raising=False
+    )
+    client = SimpleNamespace(is_connected=True, disconnect=AsyncMock())
+    session = SimpleNamespace(start=AsyncMock(), close=AsyncMock())
+    monkeypatch.setattr(module, "connect", AsyncMock(return_value=client))
+    monkeypatch.setattr(module, "F11Session", lambda *_a: session)
+    if failure:
+        error = (
+            module.AuthenticationError if failure == "authentication" else asyncio.CancelledError
+        )
+        session.start.side_effect = error()
+        with pytest.raises(error):
+            await module.validate_connection(object(), "AA:BB:CC:DD:EE:FF", "00" * 12)
+    else:
+        await module.validate_connection(object(), "AA:BB:CC:DD:EE:FF", "00" * 12)
+    session.close.assert_awaited_once()
+    client.disconnect.assert_awaited_once()
+    assert removed == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["authentication", "cancelled", "unload"])
+async def test_failed_reconfigure_preserves_old_entry(modules, monkeypatch, failure):
+    module = modules("config_flow")
+    current = entry()
+    manager = SimpleNamespace(
+        async_unload=AsyncMock(return_value=failure != "unload"), async_reload=AsyncMock()
+    )
+    flow = module.ConfigFlow()
+    flow.hass = SimpleNamespace(config_entries=manager)
+    monkeypatch.setattr(flow, "_get_reconfigure_entry", lambda: current, raising=False)
+    error = asyncio.CancelledError if failure == "cancelled" else module.AuthenticationError
+    validate = AsyncMock(side_effect=error())
+    monkeypatch.setattr(module, "validate_connection", validate)
+    if failure == "cancelled":
+        with pytest.raises(asyncio.CancelledError):
+            await flow.async_step_reconfigure({"token": "11" * 12})
+    else:
+        result = await flow.async_step_reconfigure({"token": "11" * 12})
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == (
+            "cannot_connect" if failure == "unload" else "invalid_auth"
+        )
+    assert current.data["token"] == "00" * 12
+    if failure == "unload":
+        validate.assert_not_awaited()
+        manager.async_reload.assert_not_awaited()
+    else:
+        manager.async_reload.assert_awaited_once_with(current.entry_id)
