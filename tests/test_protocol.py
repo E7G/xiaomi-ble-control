@@ -113,7 +113,7 @@ class FakeDevice:
             packet = AESCCM(self.keys[16:32], tag_length=4).decrypt(nonce, bytes(payload[2:]), None)
             self.commands.append(packet)
             tid = int.from_bytes(packet[2:4], "little")
-            response = struct.pack("<HHBB", 0x200B, tid, 1, 1) + bytes.fromhex("0302000000")
+            response = struct.pack("<HHBB", 0x200B, tid, 1, 1) + packet[6:9] + bytes(2)
             self.report(response)
 
     def report(self, packet, single=True, tamper=False):
@@ -152,6 +152,9 @@ async def test_login_report_and_serialized_writes():
         assert reports[-1][3, 3] == 480
         await asyncio.gather(session.write(3, 2, 20), session.write(3, 2, 40))
         assert [packet[-1] for packet in device.commands] == [20, 40]
+        await session.write(3, 5, 1)
+        await session.write(3, 3, 480)
+        assert device.commands[-1][-2:] == bytes.fromhex("e001")
     finally:
         await session.close()
 

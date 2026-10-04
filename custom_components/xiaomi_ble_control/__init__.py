@@ -6,7 +6,7 @@ from homeassistant.helpers import config_validation as cv
 from .const import DOMAIN
 from .coordinator import F11Coordinator
 
-PLATFORMS = [Platform.FAN]
+PLATFORMS = [Platform.FAN, Platform.LIGHT, Platform.NUMBER, Platform.SENSOR, Platform.BINARY_SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 

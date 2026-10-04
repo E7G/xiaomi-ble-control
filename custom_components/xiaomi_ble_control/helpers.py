@@ -1,8 +1,24 @@
 """Input and advertisement validation without Home Assistant dependencies."""
 
+import math
 import re
 
 from .const import PRODUCT_ID, SERVICE_UUID
+
+# Mi Home F11's actual five buttons; HA's fan percentages are logical levels.
+LEVEL_SPEEDS = (0, 1, 25, 50, 75, 100)
+
+
+def percentage_to_speed(percentage: float) -> int:
+    if not math.isfinite(percentage) or not 0 <= percentage <= 100:
+        raise ValueError("Percentage must be between 0 and 100")
+    return LEVEL_SPEEDS[math.ceil(percentage / 20)]
+
+
+def speed_to_level(speed: int) -> int:
+    if speed <= 0:
+        return 0
+    return min(range(1, 6), key=lambda level: abs(LEVEL_SPEEDS[level] - speed))
 
 
 def normalize_address(address: str) -> str:

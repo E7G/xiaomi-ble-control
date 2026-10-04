@@ -100,15 +100,15 @@ async def test_fan_encoding_and_feedback_not_optimistic(modules):
         async_write_speed=AsyncMock(),
     )
     fan = module.F11Fan(coordinator, entry())
-    assert fan.percentage == 40
+    assert fan.percentage == 60
     assert fan.available and fan.is_on
     await fan.async_turn_on()
     await fan.async_set_percentage(20)
     await fan.async_turn_off()
-    assert [call.args[0] for call in coordinator.async_write_speed.await_args_list] == [1, 20, 0]
-    assert fan.percentage == 40  # no optimistic mutation
+    assert [call.args[0] for call in coordinator.async_write_speed.await_args_list] == [1, 1, 0]
+    assert fan.percentage == 60  # no optimistic mutation
     coordinator.data["properties"][3, 2] = 148
-    assert fan.percentage == 20
+    assert fan.percentage == 40
     coordinator.data["properties"][3, 2] = 1
     assert fan.percentage == 0 and not fan.is_on
     with pytest.raises(RuntimeError):
@@ -156,6 +156,121 @@ async def test_diagnostics_never_include_token(modules):
     )
     assert data["properties"] == {"3.p.6": 43}
     assert "token" not in str(data) and "secret" not in str(data)
+
+
+@pytest.mark.parametrize("level,raw", [(0, 0), (1, 1), (2, 25), (3, 50), (4, 75), (5, 100)])
+def test_five_levels_match_mi_home(modules, level, raw):
+    helpers = modules("helpers")
+    assert helpers.percentage_to_speed(level * 20) == raw
+    assert helpers.speed_to_level(raw) == level
+
+
+@pytest.mark.asyncio
+async def test_bemfa_bridge_skips_lowest_level_without_affecting_main_fan(modules):
+    module = modules("fan")
+    coordinator = SimpleNamespace(
+        address=entry().data["address"],
+        data={"available": True, "properties": {(3, 2): 129}},
+        async_write_speed=AsyncMock(),
+    )
+    main = module.F11Fan(coordinator, entry())
+    bridge = module.F11BemfaFan(coordinator, entry())
+    assert main._attr_speed_count == 5 and bridge._attr_speed_count == 4
+    assert main.percentage == 20 and bridge.percentage == 1
+    await bridge.async_turn_on()
+    for percentage in (25, 50, 75, 100):
+        await bridge.async_set_percentage(percentage)
+        coordinator.data["properties"][3, 2] = 128 + percentage
+        assert bridge.percentage == percentage
+    await bridge.async_turn_off()
+    assert [call.args[0] for call in coordinator.async_write_speed.await_args_list] == [
+        25,
+        25,
+        50,
+        75,
+        100,
+        0,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_all_controls_are_real_non_optimistic_properties(modules):
+    light_module = modules("light")
+    numbers = modules("number")
+    sensors = modules("sensor")
+    binary = modules("binary_sensor")
+    coordinator = SimpleNamespace(
+        address=entry().data["address"],
+        data={
+            "available": True,
+            "properties": {
+                (3, 2): 153,
+                (3, 3): 60,
+                (3, 5): 0,
+                (3, 6): 80,
+                (3, 1): 1,
+                (3, 4): 3580,
+                (2, 1034): 1,
+            },
+        },
+        async_write_property=AsyncMock(),
+    )
+    light = light_module.F11NightLight(coordinator, entry())
+    await light.async_turn_on()
+    assert light.available and not light.is_on
+    coordinator.data["properties"][3, 5] = 1
+    assert light.is_on
+    await light.async_turn_off()
+    for key, prop, maximum, write in [
+        ("speed_level", (3, 2), 5, 5),
+        ("stepless_speed", (3, 2), 100, 37),
+        ("off_timer", (3, 3), 480, 480),
+    ]:
+        number = numbers.F11Number(coordinator, entry(), key, prop, maximum)
+        before = number.native_value
+        await number.async_set_native_value(write)
+        assert number.native_value == before
+        for invalid in (-1, maximum + 1, 1.5, float("nan"), float("inf")):
+            with pytest.raises(RuntimeError):
+                await number.async_set_native_value(invalid)
+    assert [call.args for call in coordinator.async_write_property.await_args_list] == [
+        (3, 5, 1),
+        (3, 5, 0),
+        (3, 2, 100),
+        (3, 2, 37),
+        (3, 3, 480),
+    ]
+    assert [
+        sensors.F11Sensor(coordinator, entry(), *d).native_value for d in sensors.DEFINITIONS
+    ] == [80, "charging", "on", 3580]
+    connected = binary.F11BinarySensor(coordinator, entry(), "connection")
+    charging = binary.F11BinarySensor(coordinator, entry(), "charging", (2, 1034))
+    assert connected.available and connected.is_on and charging.is_on
+    coordinator.data["available"] = False
+    assert (
+        connected.available
+        and not connected.is_on
+        and not light.available
+        and not charging.available
+    )
+
+
+@pytest.mark.asyncio
+async def test_write_property_allowlist(modules):
+    module = modules("coordinator")
+    coordinator = module.F11Coordinator(object(), entry())
+    coordinator._session = SimpleNamespace(write=AsyncMock())
+    coordinator._ready = True
+    coordinator._report({(3, 2): 129})
+    await coordinator.async_write_property(3, 5, 1)
+    await coordinator.async_write_property(3, 3, 480)
+    for args in ((3, 1, 1), (3, 5, 2), (3, 3, 481), (3, 2, 101), (3, 3, 1.5)):
+        with pytest.raises(RuntimeError):
+            await coordinator.async_write_property(*args)
+    assert [call.args for call in coordinator._session.write.await_args_list] == [
+        (3, 5, 1),
+        (3, 3, 480),
+    ]
 
 
 @pytest.mark.asyncio

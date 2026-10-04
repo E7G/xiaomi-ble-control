@@ -33,5 +33,60 @@
       "not_supported": "不支持此设备。",
       "reconfigure_successful": "配置已更新。"
     }
+  },
+  "entity": {
+    "fan": {
+      "bemfa_fan": {
+        "name": "巴法云风扇（四档）"
+      }
+    },
+    "light": {
+      "night_light": {
+        "name": "夜灯"
+      }
+    },
+    "number": {
+      "speed_level": {
+        "name": "档位"
+      },
+      "stepless_speed": {
+        "name": "无级调速"
+      },
+      "off_timer": {
+        "name": "关机定时"
+      }
+    },
+    "sensor": {
+      "battery": {
+        "name": "电量"
+      },
+      "charging_state": {
+        "name": "充电状态",
+        "state": {
+          "not_charging": "未充电",
+          "charging": "充电中",
+          "full": "已充满"
+        }
+      },
+      "work_status": {
+        "name": "工作状态",
+        "state": {
+          "off": "关闭",
+          "on": "运行",
+          "idle": "待机"
+        }
+      },
+      "remaining_time": {
+        "name": "剩余时间"
+      }
+    },
+    "binary_sensor": {
+      "charging": {
+        "name": "正在充电"
+      },
+      "connection": {
+        "name": "蓝牙连接"
+      }
+    }
   }
 }

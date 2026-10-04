@@ -7,13 +7,19 @@
       "connectable": true
     }
   ],
-  "codeowners": ["@E7G"],
+  "codeowners": [
+    "@E7G"
+  ],
   "config_flow": true,
-  "dependencies": ["bluetooth"],
+  "dependencies": [
+    "bluetooth"
+  ],
   "documentation": "https://github.com/E7G/xiaomi-ble-control",
   "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/E7G/xiaomi-ble-control/issues",
-  "requirements": ["bleak-retry-connector>=3.0.0"],
-  "version": "0.1.0"
+  "requirements": [
+    "bleak-retry-connector>=3.0.0"
+  ],
+  "version": "0.2.0"
 }

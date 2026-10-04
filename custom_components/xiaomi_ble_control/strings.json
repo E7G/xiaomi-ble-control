@@ -33,5 +33,60 @@
       "not_supported": "This device is not supported.",
       "reconfigure_successful": "Configuration updated."
     }
+  },
+  "entity": {
+    "fan": {
+      "bemfa_fan": {
+        "name": "Bemfa fan (4 levels)"
+      }
+    },
+    "light": {
+      "night_light": {
+        "name": "Night light"
+      }
+    },
+    "number": {
+      "speed_level": {
+        "name": "Speed level"
+      },
+      "stepless_speed": {
+        "name": "Stepless speed"
+      },
+      "off_timer": {
+        "name": "Off timer"
+      }
+    },
+    "sensor": {
+      "battery": {
+        "name": "Battery"
+      },
+      "charging_state": {
+        "name": "Charging state",
+        "state": {
+          "not_charging": "Not charging",
+          "charging": "Charging",
+          "full": "Full"
+        }
+      },
+      "work_status": {
+        "name": "Work status",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "idle": "Idle"
+        }
+      },
+      "remaining_time": {
+        "name": "Remaining time"
+      }
+    },
+    "binary_sensor": {
+      "charging": {
+        "name": "Charging"
+      },
+      "connection": {
+        "name": "Connection"
+      }
+    }
   }
 }

@@ -35,8 +35,36 @@ def modules(monkeypatch):
         CONF_TOKEN="token",
         CONF_NAME="name",
         EVENT_HOMEASSISTANT_STOP="stop",
+        PERCENTAGE="%",
+        UnitOfTime=SimpleNamespace(MINUTES="min", SECONDS="s"),
     )
     register("homeassistant.exceptions", HomeAssistantError=RuntimeError)
+    register(
+        "homeassistant.helpers.entity", EntityCategory=SimpleNamespace(DIAGNOSTIC="diagnostic")
+    )
+    register(
+        "homeassistant.components.light",
+        LightEntity=type("LightEntity", (), {}),
+        ColorMode=SimpleNamespace(ONOFF="onoff"),
+    )
+    register(
+        "homeassistant.components.number",
+        NumberEntity=type("NumberEntity", (), {}),
+        NumberMode=SimpleNamespace(BOX="box"),
+    )
+    register(
+        "homeassistant.components.sensor",
+        SensorEntity=type("SensorEntity", (), {}),
+        SensorDeviceClass=SimpleNamespace(BATTERY="battery", ENUM="enum", DURATION="duration"),
+        SensorStateClass=SimpleNamespace(MEASUREMENT="measurement"),
+    )
+    register(
+        "homeassistant.components.binary_sensor",
+        BinarySensorEntity=type("BinarySensorEntity", (), {}),
+        BinarySensorDeviceClass=SimpleNamespace(
+            CONNECTIVITY="connectivity", BATTERY_CHARGING="battery_charging"
+        ),
+    )
     register("homeassistant.helpers.config_validation", string=str)
     register(
         "homeassistant.helpers.selector",

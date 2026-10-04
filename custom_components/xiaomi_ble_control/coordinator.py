@@ -164,10 +164,20 @@ class F11Coordinator(DataUpdateCoordinator):
             delay = min(delay * 2, 60)
 
     async def async_write_speed(self, value):
+        await self.async_write_property(3, 2, value)
+
+    async def async_write_property(self, siid, piid, value):
+        limits = {(3, 2): 100, (3, 3): 480, (3, 5): 1}
+        if (
+            (siid, piid) not in limits
+            or not isinstance(value, int)
+            or not 0 <= value <= limits[siid, piid]
+        ):
+            raise HomeAssistantError("Unsupported F11 property or value")
         if not self.data["available"] or self._session is None:
             raise HomeAssistantError("F11 Bluetooth connection unavailable")
         try:
-            await self._session.write(3, 2, value)
+            await self._session.write(siid, piid, value)
         except Exception:
             # Do not include upstream exception reprs or protocol credentials.
-            raise HomeAssistantError("F11 speed command failed") from None
+            raise HomeAssistantError("F11 property command failed") from None
