@@ -1,0 +1,37 @@
+{
+  "title": "Xiaomi BLE Control",
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Connect an AIVI F11 Pro",
+        "description": "Only szxzh.fan.f11 is supported. Wake the fan and exit its Mi Home page. Enter its 12-byte BLE token, not a 16-byte bindkey or gateway token.",
+        "data": {
+          "address": "Bluetooth MAC address",
+          "token": "BLE token (24 hex characters)",
+          "name": "Device name"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure F11",
+        "description": "Enter the current BLE token. The connection is briefly released for validation.",
+        "data": {
+          "token": "BLE token (24 hex characters)",
+          "name": "Device name"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "Enter a MAC address such as AA:BB:CC:DD:EE:FF.",
+      "invalid_token": "Enter exactly 24 hexadecimal characters.",
+      "invalid_auth": "BLE authentication failed. Check the 12-byte token.",
+      "cannot_connect": "Connection failed. Wake the fan, move it near an active adapter/proxy, and exit Mi Home.",
+      "not_supported": "The selected device is not szxzh.fan.f11."
+    },
+    "abort": {
+      "already_configured": "This fan is already configured.",
+      "not_supported": "This device is not supported.",
+      "reconfigure_successful": "Configuration updated."
+    }
+  }
+}

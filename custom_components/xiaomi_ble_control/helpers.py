@@ -1,0 +1,25 @@
+"""Input and advertisement validation without Home Assistant dependencies."""
+
+import re
+
+from .const import PRODUCT_ID, SERVICE_UUID
+
+
+def normalize_address(address: str) -> str:
+    address = address.strip().upper()
+    if not re.fullmatch(r"(?:[0-9A-F]{2}:){5}[0-9A-F]{2}", address):
+        raise ValueError("Invalid Bluetooth MAC address")
+    return address
+
+
+def normalize_token(token: str) -> str:
+    token = token.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{24}", token):
+        raise ValueError("Expected a 12-byte BLE token")
+    return token
+
+
+def supported_advertisement(service_data: dict[str, bytes]) -> bool:
+    """MiBeacon product ID follows the two-byte frame-control field."""
+    data = service_data.get(SERVICE_UUID, b"")
+    return len(data) >= 5 and int.from_bytes(data[2:4], "little") == PRODUCT_ID

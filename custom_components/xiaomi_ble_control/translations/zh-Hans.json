@@ -1,0 +1,37 @@
+{
+  "title": "Xiaomi BLE Control",
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "连接 AIVI F11 Pro",
+        "description": "仅支持 szxzh.fan.f11。请唤醒风扇并退出米家控制页面。输入 12 字节 BLE 认证 token，不是 16 字节 bindkey 或网关 token。",
+        "data": {
+          "address": "蓝牙 MAC 地址",
+          "token": "BLE token（24 个十六进制字符）",
+          "name": "设备名称"
+        }
+      },
+      "reconfigure": {
+        "title": "重新配置 F11",
+        "description": "输入当前 BLE token，验证时会短暂释放现有连接。",
+        "data": {
+          "token": "BLE token（24 个十六进制字符）",
+          "name": "设备名称"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "请输入 AA:BB:CC:DD:EE:FF 格式的 MAC 地址。",
+      "invalid_token": "请输入恰好 24 个十六进制字符。",
+      "invalid_auth": "BLE 认证失败，请检查 12 字节 token。",
+      "cannot_connect": "连接失败。请唤醒风扇、靠近主动蓝牙适配器/代理，并退出米家页面。",
+      "not_supported": "此地址不是 szxzh.fan.f11 设备。"
+    },
+    "abort": {
+      "already_configured": "此风扇已配置。",
+      "not_supported": "不支持此设备。",
+      "reconfigure_successful": "配置已更新。"
+    }
+  }
+}

@@ -1,0 +1,158 @@
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+
+
+def entry():
+    return SimpleNamespace(
+        title="F11",
+        data={"address": "AA:BB:CC:DD:EE:FF", "token": "00" * 12, "name": "F11"},
+        entry_id="entry",
+    )
+
+
+def test_validation_and_discovery(modules):
+    helpers = modules("helpers")
+    assert helpers.normalize_address(" aa:bb:cc:dd:ee:ff ") == "AA:BB:CC:DD:EE:FF"
+    assert helpers.normalize_token(" AB" + "00" * 11 + " ") == "ab" + "00" * 11
+    for value in ("not-a-mac", "11:22:33:44:55", "GG:22:33:44:55:66"):
+        with pytest.raises(ValueError):
+            helpers.normalize_address(value)
+    for value in ("", "00" * 16, "z" * 24):
+        with pytest.raises(ValueError):
+            helpers.normalize_token(value)
+    service = {"0000fe95-0000-1000-8000-00805f9b34fb": bytes.fromhex("1059925f0041aa02573fc0")}
+    assert helpers.supported_advertisement(service)
+    assert not helpers.supported_advertisement({})
+    assert not helpers.supported_advertisement({next(iter(service)): bytes.fromhex("1059341200")})
+
+
+@pytest.mark.asyncio
+async def test_flow_validates_before_creating_entry(modules, monkeypatch):
+    module = modules("config_flow")
+    validate = AsyncMock()
+    monkeypatch.setattr(module, "validate_connection", validate)
+    flow = module.ConfigFlow()
+    flow.hass = object()
+    result = await flow.async_step_user(
+        {"address": "aa:bb:cc:dd:ee:ff", "token": "00" * 12, "name": "F11"}
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"]["address"] == "AA:BB:CC:DD:EE:FF"
+    validate.assert_awaited_once_with(flow.hass, "AA:BB:CC:DD:EE:FF", "00" * 12)
+
+
+@pytest.mark.asyncio
+async def test_flow_bad_input_does_not_connect(modules, monkeypatch):
+    module = modules("config_flow")
+    validate = AsyncMock()
+    monkeypatch.setattr(module, "validate_connection", validate)
+    flow = module.ConfigFlow()
+    result = await flow.async_step_user({"address": "bad", "token": "00" * 16})
+    assert result["errors"] == {"address": "invalid_address", "token": "invalid_token"}
+    validate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kind,error",
+    [("auth", "invalid_auth"), ("connect", "cannot_connect"), ("model", "not_supported")],
+)
+async def test_flow_errors(modules, monkeypatch, kind, error):
+    module = modules("config_flow")
+    exception = {
+        "auth": module.AuthenticationError,
+        "connect": TimeoutError,
+        "model": module.UnsupportedDevice,
+    }[kind]
+    monkeypatch.setattr(module, "validate_connection", AsyncMock(side_effect=exception()))
+    flow = module.ConfigFlow()
+    flow.hass = object()
+    result = await flow.async_step_user({"address": "AA:BB:CC:DD:EE:FF", "token": "00" * 12})
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": error}
+
+
+@pytest.mark.asyncio
+async def test_discovery_filters_other_xiaomi_devices(modules):
+    module = modules("config_flow")
+    flow = module.ConfigFlow()
+    result = await flow.async_step_bluetooth(
+        SimpleNamespace(service_data={}, address="AA:BB:CC:DD:EE:FF")
+    )
+    assert result == {"type": "abort", "reason": "not_supported"}
+
+
+@pytest.mark.asyncio
+async def test_fan_encoding_and_feedback_not_optimistic(modules):
+    module = modules("fan")
+    coordinator = SimpleNamespace(
+        address=entry().data["address"],
+        data={
+            "available": True,
+            "properties": {(3, 2): 168},
+            "bluetooth_status": "connected",
+            "bluetooth_source": "proxy",
+            "rssi": -50,
+        },
+        async_write_speed=AsyncMock(),
+    )
+    fan = module.F11Fan(coordinator, entry())
+    assert fan.percentage == 40
+    assert fan.available and fan.is_on
+    await fan.async_turn_on()
+    await fan.async_set_percentage(20)
+    await fan.async_turn_off()
+    assert [call.args[0] for call in coordinator.async_write_speed.await_args_list] == [1, 20, 0]
+    assert fan.percentage == 40  # no optimistic mutation
+    coordinator.data["properties"][3, 2] = 148
+    assert fan.percentage == 20
+    coordinator.data["properties"][3, 2] = 1
+    assert fan.percentage == 0 and not fan.is_on
+    with pytest.raises(RuntimeError):
+        await fan.async_set_percentage(101)
+
+
+@pytest.mark.asyncio
+async def test_coordinator_authentication_gate_and_stop(modules):
+    module = modules("coordinator")
+    coordinator = module.F11Coordinator(object(), entry())
+    coordinator._report({(3, 2): 148})
+    assert not coordinator.data["available"]
+    coordinator._ready = True
+    coordinator._report({(3, 2): 168})
+    assert coordinator.data["available"]
+    coordinator._session = SimpleNamespace(write=AsyncMock())
+    await coordinator.async_write_speed(20)
+    coordinator._session.write.assert_awaited_once_with(3, 2, 20)
+    coordinator._ready = False
+    coordinator._publish()
+    with pytest.raises(RuntimeError):
+        await coordinator.async_write_speed(20)
+    coordinator._task = asyncio.create_task(asyncio.sleep(100))
+    removed = []
+    coordinator._removers = [lambda: removed.append(True)]
+    await coordinator.async_stop()
+    assert removed == [True] and coordinator._task is None
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_never_include_token(modules):
+    module = modules("diagnostics")
+    coordinator = SimpleNamespace(
+        address="AA:BB:CC:DD:EE:FF",
+        data={
+            "available": False,
+            "bluetooth_status": "waiting",
+            "bluetooth_source": None,
+            "rssi": None,
+            "properties": {(3, 6): 43},
+        },
+    )
+    data = await module.async_get_config_entry_diagnostics(
+        None, SimpleNamespace(runtime_data=coordinator, data={"token": "secret"})
+    )
+    assert data["properties"] == {"3.p.6": 43}
+    assert "token" not in str(data) and "secret" not in str(data)
